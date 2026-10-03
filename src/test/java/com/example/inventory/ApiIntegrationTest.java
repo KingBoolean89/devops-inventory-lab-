@@ -1,5 +1,6 @@
 package com.example.inventory;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
@@ -25,6 +27,12 @@ class ApiIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Value("${app.security.username}")
+    private String basicAuthUsername;
+
+    @Value("${app.security.password}")
+    private String basicAuthPassword;
+
     @Test
     void healthEndpointIsPublic() throws Exception {
         mockMvc.perform(get("/actuator/health"))
@@ -35,6 +43,19 @@ class ApiIntegrationTest {
     @Test
     void apiRequiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/categories"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().exists(HttpHeaders.WWW_AUTHENTICATE));
+    }
+
+    @Test
+    void apiAcceptsConfiguredBasicCredentials() throws Exception {
+        mockMvc.perform(get("/api/categories").with(httpBasic(basicAuthUsername, basicAuthPassword)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void apiRejectsIncorrectBasicCredentials() throws Exception {
+        mockMvc.perform(get("/api/categories").with(httpBasic(basicAuthUsername, basicAuthPassword + "-wrong")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().exists(HttpHeaders.WWW_AUTHENTICATE));
     }
@@ -69,6 +90,26 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.categoryName").value("Hardware"));
 
+        mockMvc.perform(put("/api/products/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "sku": "HAMMER-001",
+                                  "name": "Claw Hammer",
+                                  "description": "Updated description",
+                                  "price": 19.99,
+                                  "categoryId": 1
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categoryName").value("Hardware"))
+                .andExpect(jsonPath("$.price").value(19.99));
+
+        mockMvc.perform(get("/api/products/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("Updated description"))
+                .andExpect(jsonPath("$.price").value(19.99));
+
         mockMvc.perform(put("/api/inventory/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -85,6 +126,23 @@ class ApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sku").value("HAMMER-001"))
                 .andExpect(jsonPath("$.productName").value("Claw Hammer"));
+
+        mockMvc.perform(put("/api/inventory/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "quantity": 25,
+                                  "reorderLevel": 5
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantity").value(25))
+                .andExpect(jsonPath("$.reorderLevel").value(5));
+
+        mockMvc.perform(get("/api/inventory/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantity").value(25))
+                .andExpect(jsonPath("$.reorderLevel").value(5));
 
         mockMvc.perform(delete("/api/inventory/1"))
                 .andExpect(status().isNoContent());

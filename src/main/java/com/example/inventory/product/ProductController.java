@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,6 +48,7 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
+    @Transactional
     public ProductResponse update(@PathVariable Long id, @Valid @RequestBody ProductRequest request) {
         Product product = findProduct(id);
         apply(request, product);
