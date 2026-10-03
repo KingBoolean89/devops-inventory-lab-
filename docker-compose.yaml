@@ -1,0 +1,34 @@
+services:
+  web:
+    image: devops-inventory-image:latest
+    environment:
+      - BASIC_AUTH_USERNAME=admin
+      - BASIC_AUTH_PASSWORD=adminpass
+      - DB_USERNAME=inventory
+      - DB_URL=jdbc:mysql://db:3306/inventory?
+      - DB_PASSWORD=inventorypass
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+  
+  db:
+    image: mysql:8.4
+    environment:
+      - MYSQL_DATABASE=inventory
+      - MYSQL_USER=inventory
+      - MYSQL_PASSWORD=inventorypass
+      - MYSQL_ROOT_PASSWORD=rootpass
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
